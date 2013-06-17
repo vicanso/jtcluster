@@ -45,18 +45,27 @@
       }
     },
     _msgHandler: function(msg) {
-      if ((msg != null ? msg.cmd : void 0) === 'restart') {
-        if (this.options.beforeRestart) {
-          return this.options.beforeRestart(function(err) {
+      var beforeRestart, cmd, func;
+      cmd = msg != null ? msg.cmd : void 0;
+      beforeRestart = this.options.beforeRestart;
+      func = '';
+      if (cmd === 'restart') {
+        func = 'disconnect';
+      } else if (cmd === 'forcerestart') {
+        func = 'kill';
+      }
+      if (func) {
+        if (beforeRestart) {
+          return beforeRestart(function(err) {
             if (!err) {
               return Object.keys(cluster.workers).forEach(function(id) {
-                return cluster.workers[id].disconnect();
+                return cluster.workers[id][func]();
               });
             }
           });
         } else {
           return Object.keys(cluster.workers).forEach(function(id) {
-            return cluster.workers[id].disconnect();
+            return cluster.workers[id][func]();
           });
         }
       }

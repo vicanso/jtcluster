@@ -27,15 +27,22 @@ jtCluster =
       d.run ->
         slaveHandler()
   _msgHandler : (msg) ->
-    if msg?.cmd == 'restart'
-      if @options.beforeRestart
-        @options.beforeRestart (err) ->
+    cmd = msg?.cmd
+    beforeRestart = @options.beforeRestart
+    func = ''
+    if cmd == 'restart'
+      func = 'disconnect'
+    else if cmd == 'forcerestart'
+      func = 'kill'
+    if func
+      if beforeRestart
+        beforeRestart (err) ->
           if !err
             Object.keys(cluster.workers).forEach (id) ->
-              cluster.workers[id].disconnect()
+              cluster.workers[id][func]()
       else
         Object.keys(cluster.workers).forEach (id) ->
-          cluster.workers[id].disconnect()
+          cluster.workers[id][func]()
   _initEvent : ->
     error = @options?.error || noop
     cluster.on 'exit', (worker) =>
@@ -48,4 +55,5 @@ jtCluster =
         @_msgHandler msg
     cluster.on 'online', (worker) ->
       console.info "worker:#{worker.process.pid} is online!"
+
 module.exports = jtCluster
