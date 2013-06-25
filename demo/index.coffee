@@ -1,5 +1,4 @@
 jtCluster = require '../index'
-jtMonitor = require 'jtmonitor'
 options = 
   slaveTotal : 1
   slaveHandler : ->

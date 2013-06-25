@@ -1,9 +1,7 @@
 (function() {
-  var jtCluster, jtMonitor, options;
+  var jtCluster, options;
 
   jtCluster = require('../index');
-
-  jtMonitor = require('jtmonitor');
 
   options = {
     slaveTotal: 1,
