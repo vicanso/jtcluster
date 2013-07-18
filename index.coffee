@@ -27,21 +27,37 @@ jtCluster =
     else
       @_slaveHandler()
     @
+  ###*
+   * _slaveHandler slave的执行函数
+   * @return {[type]} [description]
+  ###
   _slaveHandler : ->
-    error = @options?.error || noop
-    slaveHandler = @options?.slaveHandler
+    error = @options.error || noop
+    restartOnError = @options.restartOnError
+    slaveHandler = @options.slaveHandler
     domain = require 'domain'
     if slaveHandler
       # 添加domain，用于捕获异常
       d = domain.create()
       d.on 'error', (err) ->
         error err
+        if restartOnError
+          setTimeout ->
+            process.exit 1
+          , 30000
+          cluster.worker.disconnect()
       d.run ->
         slaveHandler()
     process.on 'message', (msg) ->
       if msg == CHECK_MSG
         process.send HEALTHY_MSG
     @
+  ###*
+   * _msgHandler 消息处理
+   * @param  {[type]} msg [description]
+   * @param  {[type]} pid [description]
+   * @return {[type]}     [description]
+  ###
   _msgHandler : (msg, pid) ->
     # 检测worker是否有响应healthy
     if msg == HEALTHY_MSG
@@ -62,6 +78,12 @@ jtCluster =
         func = 'kill'
       @_do func, msg.timeout
     @
+  ###*
+   * _do 执行message中的命令
+   * @param  {[type]} func    [description]
+   * @param  {[type]} timeout =             30000 [description]
+   * @return {[type]}         [description]
+  ###
   _do : (func, timeout = 30000) ->
     beforeRestart = @options.beforeRestart
     # timeout时间之内如果worker没退出，强制kill
@@ -87,6 +109,10 @@ jtCluster =
           if func != 'kill'
             forceKill worker
     @
+  ###*
+   * _initEvent 初始化事件，消息的处理
+   * @return {[type]} [description]
+  ###
   _initEvent : ->
     error = @options?.error || noop
     cluster.on 'exit', (worker) =>

@@ -8,6 +8,7 @@ options =
   failTimes : 5
   # 子进程的个数
   slaveTotal : 3
+  restartOnError : true
   slaveHandler : ->
     http = require 'http'
     server = http.createServer (req, res) ->
@@ -24,13 +25,15 @@ options =
             j = 0
           return
         , 100
+      else if req.url == '/error'
+        throw new Error 'throw error'
       res.writeHead 200
       res.end 'hello world'
     port = 8080
     server.listen port
     console.dir "listen on #{port}"
   error : (err) ->
-    console.dir err
+    console.dir err.stack
   beforeRestart : (cbf) ->
     #do some before restart
     setTimeout ->

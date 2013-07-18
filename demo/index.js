@@ -8,6 +8,7 @@
     timeout: 5 * 1000,
     failTimes: 5,
     slaveTotal: 3,
+    restartOnError: true,
     slaveHandler: function() {
       var http, port, server;
       http = require('http');
@@ -28,6 +29,8 @@
               j = 0;
             }
           }, 100);
+        } else if (req.url === '/error') {
+          throw new Error('throw error');
         }
         res.writeHead(200);
         return res.end('hello world');
@@ -37,7 +40,7 @@
       return console.dir("listen on " + port);
     },
     error: function(err) {
-      return console.dir(err);
+      return console.dir(err.stack);
     },
     beforeRestart: function(cbf) {
       return setTimeout(function() {

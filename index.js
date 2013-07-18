@@ -44,15 +44,27 @@
       }
       return this;
     },
+    /**
+     * _slaveHandler slave的执行函数
+     * @return {[type]} [description]
+    */
+
     _slaveHandler: function() {
-      var d, domain, error, slaveHandler, _ref, _ref1;
-      error = ((_ref = this.options) != null ? _ref.error : void 0) || noop;
-      slaveHandler = (_ref1 = this.options) != null ? _ref1.slaveHandler : void 0;
+      var d, domain, error, restartOnError, slaveHandler;
+      error = this.options.error || noop;
+      restartOnError = this.options.restartOnError;
+      slaveHandler = this.options.slaveHandler;
       domain = require('domain');
       if (slaveHandler) {
         d = domain.create();
         d.on('error', function(err) {
-          return error(err);
+          error(err);
+          if (restartOnError) {
+            setTimeout(function() {
+              return process.exit(1);
+            }, 30000);
+            return cluster.worker.disconnect();
+          }
         });
         d.run(function() {
           return slaveHandler();
@@ -65,6 +77,13 @@
       });
       return this;
     },
+    /**
+     * _msgHandler 消息处理
+     * @param  {[type]} msg [description]
+     * @param  {[type]} pid [description]
+     * @return {[type]}     [description]
+    */
+
     _msgHandler: function(msg, pid) {
       var cmd, func;
       if (msg === HEALTHY_MSG) {
@@ -88,6 +107,13 @@
       }
       return this;
     },
+    /**
+     * _do 执行message中的命令
+     * @param  {[type]} func    [description]
+     * @param  {[type]} timeout =             30000 [description]
+     * @return {[type]}         [description]
+    */
+
     _do: function(func, timeout) {
       var beforeRestart, forceKill;
       if (timeout == null) {
@@ -128,6 +154,11 @@
       }
       return this;
     },
+    /**
+     * _initEvent 初始化事件，消息的处理
+     * @return {[type]} [description]
+    */
+
     _initEvent: function() {
       var error, _ref,
         _this = this;
