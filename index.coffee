@@ -72,42 +72,56 @@ jtCluster =
     cmd = msg?.cmd
     if cmd
       func = ''
-      if cmd == 'restart'
+      if cmd == 'jt_restart'
         func = 'disconnect'
-      else if cmd == 'forcerestart'
+      else if cmd == 'jt_restartall'
+        func = 'disconnect'
+        pid = null
+      else if cmd == 'jt_kill'
         func = 'kill'
-      @_do func, msg.timeout
+      else if cmd == 'jt_killall'
+        func = 'kill'
+        pid = null
+      @_do func, pid
     @
   ###*
    * _do 执行message中的命令
    * @param  {[type]} func    [description]
-   * @param  {[type]} timeout =             30000 [description]
+   * @param  {[type]} pid [description]
    * @return {[type]}         [description]
   ###
-  _do : (func, timeout = 30000) ->
+  _do : (func, pid) ->
     beforeRestart = @options.beforeRestart
     # timeout时间之内如果worker没退出，强制kill
     forceKill = (worker) ->
       setTimeout ->
         if worker.state != 'dead'
           worker.kill()
-      , timeout
+      , 30000
+    restart = (worker, pid) ->
+      if pid
+        if worker.process.pid == pid
+          worker[func]()
+          # 多长时间没退出直接使用kill
+          if func != 'kill'
+            forceKill worker
+      else
+        worker[func]()
+        # 多长时间没退出直接使用kill
+        if func != 'kill'
+          forceKill worker
     if func
       if beforeRestart
         beforeRestart (err) ->
           if !err
             Object.keys(cluster.workers).forEach (id) ->
               worker = cluster.workers[id]
-              worker[func]()
-              # 多长时间没退出直接使用kill
-              if func != 'kill'
-                forceKill worker
+              restart worker, pid
       else
         Object.keys(cluster.workers).forEach (id) ->
           worker = cluster.workers[id]
-          worker[func]()
-          if func != 'kill'
-            forceKill worker
+          restart worker, pid
+
     @
   ###*
    * _initEvent 初始化事件，消息的处理

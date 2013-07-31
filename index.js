@@ -98,34 +98,52 @@
       cmd = msg != null ? msg.cmd : void 0;
       if (cmd) {
         func = '';
-        if (cmd === 'restart') {
+        if (cmd === 'jt_restart') {
           func = 'disconnect';
-        } else if (cmd === 'forcerestart') {
+        } else if (cmd === 'jt_restartall') {
+          func = 'disconnect';
+          pid = null;
+        } else if (cmd === 'jt_kill') {
           func = 'kill';
+        } else if (cmd === 'jt_killall') {
+          func = 'kill';
+          pid = null;
         }
-        this._do(func, msg.timeout);
+        this._do(func, pid);
       }
       return this;
     },
     /**
      * _do 执行message中的命令
      * @param  {[type]} func    [description]
-     * @param  {[type]} timeout =             30000 [description]
+     * @param  {[type]} pid [description]
      * @return {[type]}         [description]
     */
 
-    _do: function(func, timeout) {
-      var beforeRestart, forceKill;
-      if (timeout == null) {
-        timeout = 30000;
-      }
+    _do: function(func, pid) {
+      var beforeRestart, forceKill, restart;
       beforeRestart = this.options.beforeRestart;
       forceKill = function(worker) {
         return setTimeout(function() {
           if (worker.state !== 'dead') {
             return worker.kill();
           }
-        }, timeout);
+        }, 30000);
+      };
+      restart = function(worker, pid) {
+        if (pid) {
+          if (worker.process.pid === pid) {
+            worker[func]();
+            if (func !== 'kill') {
+              return forceKill(worker);
+            }
+          }
+        } else {
+          worker[func]();
+          if (func !== 'kill') {
+            return forceKill(worker);
+          }
+        }
       };
       if (func) {
         if (beforeRestart) {
@@ -134,10 +152,7 @@
               return Object.keys(cluster.workers).forEach(function(id) {
                 var worker;
                 worker = cluster.workers[id];
-                worker[func]();
-                if (func !== 'kill') {
-                  return forceKill(worker);
-                }
+                return restart(worker, pid);
               });
             }
           });
@@ -145,10 +160,7 @@
           Object.keys(cluster.workers).forEach(function(id) {
             var worker;
             worker = cluster.workers[id];
-            worker[func]();
-            if (func !== 'kill') {
-              return forceKill(worker);
-            }
+            return restart(worker, pid);
           });
         }
       }

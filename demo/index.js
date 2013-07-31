@@ -15,12 +15,18 @@
       server = http.createServer(function(req, res) {
         if (req.url === '/restart') {
           process.send({
-            cmd: 'restart',
+            cmd: 'jt_restart',
             timeout: 30000
           });
-        } else if (req.url === '/forcerestart') {
+        }
+        if (req.url === '/restartall') {
           process.send({
-            cmd: 'forcerestart'
+            cmd: 'jt_restartall',
+            timeout: 30000
+          });
+        } else if (req.url === '/kill') {
+          process.send({
+            cmd: 'jt_kill'
           });
         } else if (req.url === '/fullrun') {
           setTimeout(function() {
@@ -35,7 +41,7 @@
         res.writeHead(200);
         return res.end('hello world');
       });
-      port = 8080;
+      port = 10000;
       server.listen(port);
       return console.dir("listen on " + port);
     },

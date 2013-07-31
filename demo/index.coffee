@@ -14,11 +14,16 @@ options =
     server = http.createServer (req, res) ->
       if req.url == '/restart'
         process.send {
-          cmd : 'restart'
+          cmd : 'jt_restart'
           timeout : 30000
         }
-      else if req.url == '/forcerestart'
-        process.send {cmd : 'forcerestart'}
+      if req.url == '/restartall'
+        process.send {
+          cmd : 'jt_restartall'
+          timeout : 30000
+        }
+      else if req.url == '/kill'
+        process.send {cmd : 'jt_kill'}
       else if req.url == '/fullrun'
         setTimeout ->
           while true
@@ -29,7 +34,7 @@ options =
         throw new Error 'throw error'
       res.writeHead 200
       res.end 'hello world'
-    port = 8080
+    port = 10000
     server.listen port
     console.dir "listen on #{port}"
   error : (err) ->
