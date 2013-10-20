@@ -19,16 +19,16 @@
     */
 
     start: function(options) {
-      var i, total, _i, _ref, _ref1, _ref2;
+      var i, total, _i;
       this.options = options != null ? options : {};
       if (cluster.isMaster) {
-        if ((_ref = options.interval) == null) {
+        if (options.interval == null) {
           options.interval = 60 * 1000;
         }
-        if ((_ref1 = options.timeout) == null) {
+        if (options.timeout == null) {
           options.timeout = 10 * 1000;
         }
-        if ((_ref2 = options.failTimes) == null) {
+        if (options.failTimes == null) {
           options.failTimes = 5;
         }
         if (options.masterHandler) {
