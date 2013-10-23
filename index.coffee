@@ -1,5 +1,5 @@
 cluster = require 'cluster'
-
+events = require 'events'
 CHECK_TIMES = {}
 
 CHECK_MSG = 'WORKER_CHECK'
@@ -8,7 +8,7 @@ HEALTHY_MSG = 'I AM HEALTHY'
 noop = ->
 
 
-jtCluster = 
+class JTCluster extends events.EventEmitter
   ###*
    * start 启动应用
    * @param  {[type]} @options [description]
@@ -22,6 +22,7 @@ jtCluster =
       if options.masterHandler
         options.masterHandler()
       total = options.slaveTotal || require('os').cpus().length
+      total = 1 if total < 1
       cluster.fork() for i in [0...total]
       @_initEvent()
     else
@@ -32,15 +33,16 @@ jtCluster =
    * @return {[type]} [description]
   ###
   _slaveHandler : ->
-    error = @options.error || noop
+    # error = @options.error || noop
     restartOnError = @options.restartOnError
     slaveHandler = @options.slaveHandler
     domain = require 'domain'
     if slaveHandler
       # 添加domain，用于捕获异常
       d = domain.create()
-      d.on 'error', (err) ->
-        error err
+      d.on 'error', (err) =>
+        @emit 'error', err
+        # error err
         if restartOnError
           setTimeout ->
             process.exit 1
@@ -121,19 +123,18 @@ jtCluster =
         Object.keys(cluster.workers).forEach (id) ->
           worker = cluster.workers[id]
           restart worker, pid
-
     @
   ###*
    * _initEvent 初始化事件，消息的处理
    * @return {[type]} [description]
   ###
   _initEvent : ->
-    error = @options?.error || noop
+    # error = @options?.error || noop
     cluster.on 'exit', (worker) =>
       # 当有worker退出时，重新fork一个新的
       pid = worker.process.pid
       delete CHECK_TIMES[pid]
-      error new Error "worker:#{pid} died!"
+      @emit 'error', new Error "worker:#{pid} died!"
       worker = cluster.fork()
       # worker添加消息处理
       worker.on 'message', (msg) =>
@@ -143,10 +144,10 @@ jtCluster =
       worker = cluster.workers[id]
       worker.on 'message', (msg) =>
         @_msgHandler msg, worker.process.pid
-    cluster.on 'online', (worker) ->
+    cluster.on 'online', (worker) =>
       pid = worker.process.pid
       CHECK_TIMES[pid] = {fail : 0}
-      console.info "worker:#{pid} is online!"
+      @emit 'log', "worker:#{pid} is online!"
     setTimeout =>
       @_checkWorker()
     , @options.interval
@@ -160,6 +161,7 @@ jtCluster =
       if CHECK_TIMES[pid].now
         CHECK_TIMES[pid].fail++
       if CHECK_TIMES[pid].fail >= @options.failTimes
+        @emit 'log', "The process #{pid} is too busy, maybe something wrong. It will be restart!"
         worker.kill()
       else
         CHECK_TIMES[pid].now = Date.now()
@@ -169,4 +171,4 @@ jtCluster =
     , @options.interval
     @
 
-module.exports = jtCluster
+module.exports = JTCluster

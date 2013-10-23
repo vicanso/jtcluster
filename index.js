@@ -1,7 +1,11 @@
 (function() {
-  var CHECK_MSG, CHECK_TIMES, HEALTHY_MSG, cluster, jtCluster, noop;
+  var CHECK_MSG, CHECK_TIMES, HEALTHY_MSG, JTCluster, cluster, events, noop, _ref,
+    __hasProp = {}.hasOwnProperty,
+    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
   cluster = require('cluster');
+
+  events = require('events');
 
   CHECK_TIMES = {};
 
@@ -11,14 +15,22 @@
 
   noop = function() {};
 
-  jtCluster = {
+  JTCluster = (function(_super) {
+    __extends(JTCluster, _super);
+
+    function JTCluster() {
+      _ref = JTCluster.__super__.constructor.apply(this, arguments);
+      return _ref;
+    }
+
     /**
      * start 启动应用
      * @param  {[type]} @options [description]
      * @return {[type]}          [description]
     */
 
-    start: function(options) {
+
+    JTCluster.prototype.start = function(options) {
       var i, total, _i;
       this.options = options != null ? options : {};
       if (cluster.isMaster) {
@@ -35,6 +47,9 @@
           options.masterHandler();
         }
         total = options.slaveTotal || require('os').cpus().length;
+        if (total < 1) {
+          total = 1;
+        }
         for (i = _i = 0; 0 <= total ? _i < total : _i > total; i = 0 <= total ? ++_i : --_i) {
           cluster.fork();
         }
@@ -43,22 +58,24 @@
         this._slaveHandler();
       }
       return this;
-    },
+    };
+
     /**
      * _slaveHandler slave的执行函数
      * @return {[type]} [description]
     */
 
-    _slaveHandler: function() {
-      var d, domain, error, restartOnError, slaveHandler;
-      error = this.options.error || noop;
+
+    JTCluster.prototype._slaveHandler = function() {
+      var d, domain, restartOnError, slaveHandler,
+        _this = this;
       restartOnError = this.options.restartOnError;
       slaveHandler = this.options.slaveHandler;
       domain = require('domain');
       if (slaveHandler) {
         d = domain.create();
         d.on('error', function(err) {
-          error(err);
+          _this.emit('error', err);
           if (restartOnError) {
             setTimeout(function() {
               return process.exit(1);
@@ -76,7 +93,8 @@
         }
       });
       return this;
-    },
+    };
+
     /**
      * _msgHandler 消息处理
      * @param  {[type]} msg [description]
@@ -84,7 +102,8 @@
      * @return {[type]}     [description]
     */
 
-    _msgHandler: function(msg, pid) {
+
+    JTCluster.prototype._msgHandler = function(msg, pid) {
       var cmd, func;
       if (msg === HEALTHY_MSG) {
         if (Date.now() - CHECK_TIMES[pid].now > this.options.timeout) {
@@ -112,7 +131,8 @@
         this._do(func, pid);
       }
       return this;
-    },
+    };
+
     /**
      * _do 执行message中的命令
      * @param  {[type]} func    [description]
@@ -120,7 +140,8 @@
      * @return {[type]}         [description]
     */
 
-    _do: function(func, pid) {
+
+    JTCluster.prototype._do = function(func, pid) {
       var beforeRestart, forceKill, restart;
       beforeRestart = this.options.beforeRestart;
       forceKill = function(worker) {
@@ -165,21 +186,21 @@
         }
       }
       return this;
-    },
+    };
+
     /**
      * _initEvent 初始化事件，消息的处理
      * @return {[type]} [description]
     */
 
-    _initEvent: function() {
-      var error, _ref,
-        _this = this;
-      error = ((_ref = this.options) != null ? _ref.error : void 0) || noop;
+
+    JTCluster.prototype._initEvent = function() {
+      var _this = this;
       cluster.on('exit', function(worker) {
         var pid;
         pid = worker.process.pid;
         delete CHECK_TIMES[pid];
-        error(new Error("worker:" + pid + " died!"));
+        _this.emit('error', new Error("worker:" + pid + " died!"));
         worker = cluster.fork();
         return worker.on('message', function(msg) {
           return _this._msgHandler(msg, worker.process.pid);
@@ -198,14 +219,15 @@
         CHECK_TIMES[pid] = {
           fail: 0
         };
-        return console.info("worker:" + pid + " is online!");
+        return _this.emit('log', "worker:" + pid + " is online!");
       });
       setTimeout(function() {
         return _this._checkWorker();
       }, this.options.interval);
       return this;
-    },
-    _checkWorker: function() {
+    };
+
+    JTCluster.prototype._checkWorker = function() {
       var _this = this;
       Object.keys(cluster.workers).forEach(function(id) {
         var pid, worker;
@@ -215,6 +237,7 @@
           CHECK_TIMES[pid].fail++;
         }
         if (CHECK_TIMES[pid].fail >= _this.options.failTimes) {
+          _this.emit('log', "The process " + pid + " is too busy, maybe something wrong. It will be restart!");
           return worker.kill();
         } else {
           CHECK_TIMES[pid].now = Date.now();
@@ -225,9 +248,12 @@
         return _this._checkWorker();
       }, this.options.interval);
       return this;
-    }
-  };
+    };
 
-  module.exports = jtCluster;
+    return JTCluster;
+
+  })(events.EventEmitter);
+
+  module.exports = JTCluster;
 
 }).call(this);
