@@ -4,6 +4,7 @@ CHECK_TIMES = {}
 
 CHECK_MSG = 'WORKER_CHECK'
 HEALTHY_MSG = 'I AM HEALTHY'
+SET_JT_PID_MSG = 'SET JT PID'
 
 noop = ->
 
@@ -16,15 +17,21 @@ class JTCluster extends events.EventEmitter
   ###
   start : (@options = {}) ->
     if cluster.isMaster
-      options.interval ?= 60 * 1000
+      options.interval ?= 10 * 1000
       options.timeout ?= 10 * 1000
       options.failTimes ?= 5
       if options.masterHandler
         options.masterHandler()
       total = options.slaveTotal || require('os').cpus().length
       total = 1 if total < 1
-      cluster.fork() for i in [0...total]
+      for i in [0...total]
+        childProcess = cluster.fork()
+        childProcess._jtPid = i
+        # console.dir childProcess
       @_initEvent()
+      Object.keys(cluster.workers).forEach (id) =>
+        worker = cluster.workers[id]
+        worker.send {msg : SET_JT_PID_MSG, _jtPid : worker._jtPid}
     else
       @_slaveHandler()
     @
@@ -41,7 +48,15 @@ class JTCluster extends events.EventEmitter
       # 添加domain，用于捕获异常
       d = domain.create()
       d.on 'error', (err) =>
-        @emit 'error', err
+        params = 
+          pid : process.pid
+          _jtPid : process._jtPid
+          err : err.toString()
+        @emit 'log', {
+          category : 'uncaughtException'
+          params : JSON.stringify params
+          date : new Date
+        }
         # error err
         if restartOnError
           setTimeout ->
@@ -53,6 +68,8 @@ class JTCluster extends events.EventEmitter
     process.on 'message', (msg) ->
       if msg == CHECK_MSG
         process.send HEALTHY_MSG
+      else if msg?.msg == SET_JT_PID_MSG
+        process._jtPid = msg._jtPid
     @
   ###*
    * _msgHandler 消息处理
@@ -134,11 +151,21 @@ class JTCluster extends events.EventEmitter
       # 当有worker退出时，重新fork一个新的
       pid = worker.process.pid
       delete CHECK_TIMES[pid]
-      @emit 'error', new Error "worker:#{pid} died!"
+      _jtPid = worker._jtPid
+      params = 
+        pid : pid
+        _jtPid : _jtPid
+      @emit 'log', {
+        category : 'exit'
+        params : JSON.stringify params
+        date : new Date()
+      }
       worker = cluster.fork()
       # worker添加消息处理
       worker.on 'message', (msg) =>
         @_msgHandler msg, worker.process.pid
+      worker._jtPid = _jtPid
+      worker.send {msg : SET_JT_PID_MSG, _jtPid : _jtPid}
     Object.keys(cluster.workers).forEach (id) =>
       # 对当前的worker添加消息处理
       worker = cluster.workers[id]
@@ -147,7 +174,14 @@ class JTCluster extends events.EventEmitter
     cluster.on 'online', (worker) =>
       pid = worker.process.pid
       CHECK_TIMES[pid] = {fail : 0}
-      @emit 'log', "worker:#{pid} is online!"
+      params = 
+        pid : pid
+        _jtPid : worker._jtPid
+      @emit 'log', {
+        category : 'online'
+        params : JSON.stringify params
+        date : new Date
+      }
     setTimeout =>
       @_checkWorker()
     , @options.interval
@@ -161,7 +195,14 @@ class JTCluster extends events.EventEmitter
       if CHECK_TIMES[pid].now
         CHECK_TIMES[pid].fail++
       if CHECK_TIMES[pid].fail >= @options.failTimes
-        @emit 'log', "The process #{pid} is too busy, maybe something wrong. It will be restart!"
+        params = 
+          pid : pid
+          _jtPid : worker._jtPid
+        @emit 'log', {
+          category : 'toobusy'
+          params : JSON.stringify params
+          date : new Date
+        }
         worker.kill()
       else
         CHECK_TIMES[pid].now = Date.now()

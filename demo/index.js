@@ -1,10 +1,12 @@
 (function() {
-  var jtCluster, options;
+  var JTCluster, jtCluster, options;
 
-  jtCluster = require('../index');
+  JTCluster = require('../index');
+
+  jtCluster = new JTCluster;
 
   options = {
-    interval: 60 * 1000,
+    interval: 10 * 1000,
     timeout: 5 * 1000,
     failTimes: 5,
     slaveTotal: 3,
@@ -43,7 +45,10 @@
       });
       port = 10000;
       server.listen(port);
-      return console.dir("listen on " + port);
+      console.dir("listen on " + port);
+      return setTimeout(function() {
+        return console.dir(process._jtPid);
+      }, 1000);
     },
     error: function(err) {
       return console.dir(err.stack);
@@ -56,5 +61,9 @@
   };
 
   jtCluster.start(options);
+
+  jtCluster.on('log', function(data) {
+    return console.dir(data);
+  });
 
 }).call(this);

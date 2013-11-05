@@ -1,5 +1,5 @@
 (function() {
-  var CHECK_MSG, CHECK_TIMES, HEALTHY_MSG, JTCluster, cluster, events, noop, _ref,
+  var CHECK_MSG, CHECK_TIMES, HEALTHY_MSG, JTCluster, SET_JT_PID_MSG, cluster, events, noop, _ref,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -12,6 +12,8 @@
   CHECK_MSG = 'WORKER_CHECK';
 
   HEALTHY_MSG = 'I AM HEALTHY';
+
+  SET_JT_PID_MSG = 'SET JT PID';
 
   noop = function() {};
 
@@ -31,11 +33,12 @@
 
 
     JTCluster.prototype.start = function(options) {
-      var i, total, _i;
+      var childProcess, i, total, _i,
+        _this = this;
       this.options = options != null ? options : {};
       if (cluster.isMaster) {
         if (options.interval == null) {
-          options.interval = 60 * 1000;
+          options.interval = 10 * 1000;
         }
         if (options.timeout == null) {
           options.timeout = 10 * 1000;
@@ -51,9 +54,18 @@
           total = 1;
         }
         for (i = _i = 0; 0 <= total ? _i < total : _i > total; i = 0 <= total ? ++_i : --_i) {
-          cluster.fork();
+          childProcess = cluster.fork();
+          childProcess._jtPid = i;
         }
         this._initEvent();
+        Object.keys(cluster.workers).forEach(function(id) {
+          var worker;
+          worker = cluster.workers[id];
+          return worker.send({
+            msg: SET_JT_PID_MSG,
+            _jtPid: worker._jtPid
+          });
+        });
       } else {
         this._slaveHandler();
       }
@@ -75,7 +87,17 @@
       if (slaveHandler) {
         d = domain.create();
         d.on('error', function(err) {
-          _this.emit('error', err);
+          var params;
+          params = {
+            pid: process.pid,
+            _jtPid: process._jtPid,
+            err: err.toString()
+          };
+          _this.emit('log', {
+            category: 'uncaughtException',
+            params: JSON.stringify(params),
+            date: new Date
+          });
           if (restartOnError) {
             setTimeout(function() {
               return process.exit(1);
@@ -90,6 +112,8 @@
       process.on('message', function(msg) {
         if (msg === CHECK_MSG) {
           return process.send(HEALTHY_MSG);
+        } else if ((msg != null ? msg.msg : void 0) === SET_JT_PID_MSG) {
+          return process._jtPid = msg._jtPid;
         }
       });
       return this;
@@ -197,13 +221,27 @@
     JTCluster.prototype._initEvent = function() {
       var _this = this;
       cluster.on('exit', function(worker) {
-        var pid;
+        var params, pid, _jtPid;
         pid = worker.process.pid;
         delete CHECK_TIMES[pid];
-        _this.emit('error', new Error("worker:" + pid + " died!"));
+        _jtPid = worker._jtPid;
+        params = {
+          pid: pid,
+          _jtPid: _jtPid
+        };
+        _this.emit('log', {
+          category: 'exit',
+          params: JSON.stringify(params),
+          date: new Date()
+        });
         worker = cluster.fork();
-        return worker.on('message', function(msg) {
+        worker.on('message', function(msg) {
           return _this._msgHandler(msg, worker.process.pid);
+        });
+        worker._jtPid = _jtPid;
+        return worker.send({
+          msg: SET_JT_PID_MSG,
+          _jtPid: _jtPid
         });
       });
       Object.keys(cluster.workers).forEach(function(id) {
@@ -214,12 +252,20 @@
         });
       });
       cluster.on('online', function(worker) {
-        var pid;
+        var params, pid;
         pid = worker.process.pid;
         CHECK_TIMES[pid] = {
           fail: 0
         };
-        return _this.emit('log', "worker:" + pid + " is online!");
+        params = {
+          pid: pid,
+          _jtPid: worker._jtPid
+        };
+        return _this.emit('log', {
+          category: 'online',
+          params: JSON.stringify(params),
+          date: new Date
+        });
       });
       setTimeout(function() {
         return _this._checkWorker();
@@ -230,14 +276,22 @@
     JTCluster.prototype._checkWorker = function() {
       var _this = this;
       Object.keys(cluster.workers).forEach(function(id) {
-        var pid, worker;
+        var params, pid, worker;
         worker = cluster.workers[id];
         pid = worker.process.pid;
         if (CHECK_TIMES[pid].now) {
           CHECK_TIMES[pid].fail++;
         }
         if (CHECK_TIMES[pid].fail >= _this.options.failTimes) {
-          _this.emit('log', "The process " + pid + " is too busy, maybe something wrong. It will be restart!");
+          params = {
+            pid: pid,
+            _jtPid: worker._jtPid
+          };
+          _this.emit('log', {
+            category: 'toobusy',
+            params: JSON.stringify(params),
+            date: new Date
+          });
           return worker.kill();
         } else {
           CHECK_TIMES[pid].now = Date.now();

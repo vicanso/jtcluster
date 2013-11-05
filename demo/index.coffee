@@ -1,7 +1,8 @@
-jtCluster = require '../index'
+JTCluster = require '../index'
+jtCluster = new JTCluster
 options = 
   # 检测的时间间隔
-  interval : 60 * 1000
+  interval : 10 * 1000
   # worker检测的超时值
   timeout : 5 * 1000
   # 连续失败多少次后重启
@@ -37,6 +38,9 @@ options =
     port = 10000
     server.listen port
     console.dir "listen on #{port}"
+    setTimeout ->
+      console.dir process._jtPid
+    , 1000
   error : (err) ->
     console.dir err.stack
   beforeRestart : (cbf) ->
@@ -47,3 +51,5 @@ options =
 
 jtCluster.start options
 
+jtCluster.on 'log', (data) ->
+  console.dir data
