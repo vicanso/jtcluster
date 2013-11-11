@@ -52,6 +52,7 @@ class JTCluster extends events.EventEmitter
           pid : process.pid
           _jtPid : process._jtPid
           err : err.toString()
+          stack : err.stack
         @emit 'log', {
           category : 'uncaughtException'
           params : JSON.stringify params

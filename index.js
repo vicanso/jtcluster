@@ -91,7 +91,8 @@
           params = {
             pid: process.pid,
             _jtPid: process._jtPid,
-            err: err.toString()
+            err: err.toString(),
+            stack: err.stack
           };
           _this.emit('log', {
             category: 'uncaughtException',
