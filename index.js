@@ -170,11 +170,13 @@
       var beforeRestart, forceKill, restart;
       beforeRestart = this.options.beforeRestart;
       forceKill = function(worker) {
-        return setTimeout(function() {
+        var killtimer;
+        killtimer = setTimeout(function() {
           if (worker.state !== 'dead') {
             return worker.kill();
           }
         }, 30000);
+        return killtimer.unref();
       };
       restart = function(worker, pid) {
         if (pid) {

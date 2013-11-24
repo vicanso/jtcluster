@@ -114,10 +114,11 @@ class JTCluster extends events.EventEmitter
     beforeRestart = @options.beforeRestart
     # timeout时间之内如果worker没退出，强制kill
     forceKill = (worker) ->
-      setTimeout ->
+      killtimer = setTimeout ->
         if worker.state != 'dead'
           worker.kill()
       , 30000
+      killtimer.unref()
     restart = (worker, pid) ->
       if pid
         if worker.process.pid == pid
