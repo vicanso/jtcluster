@@ -41,8 +41,6 @@ options =
     setTimeout ->
       console.dir process._jtPid
     , 1000
-  error : (err) ->
-    console.dir err.stack
   beforeRestart : (cbf) ->
     #do some before restart
     setTimeout ->

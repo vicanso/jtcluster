@@ -50,9 +50,6 @@
         return console.dir(process._jtPid);
       }, 1000);
     },
-    error: function(err) {
-      return console.dir(err.stack);
-    },
     beforeRestart: function(cbf) {
       return setTimeout(function() {
         return cbf(null);
