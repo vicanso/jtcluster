@@ -1,5 +1,5 @@
 (function() {
-  var CHECK_MSG, CHECK_TIMES, HEALTHY_MSG, JTCluster, SET_JT_PID_MSG, cluster, events, noop, _ref,
+  var CHECK_MSG, CHECK_TIMES, HEALTHY_MSG, JTCluster, SET_JT_PID_MSG, cluster, events, noop,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -18,12 +18,25 @@
   noop = function() {};
 
   JTCluster = (function(_super) {
+
     __extends(JTCluster, _super);
 
     function JTCluster() {
-      _ref = JTCluster.__super__.constructor.apply(this, arguments);
-      return _ref;
+      return JTCluster.__super__.constructor.apply(this, arguments);
     }
+
+    /**
+     * restartAll 重启所有worker
+     * @return {[type]} [description]
+    */
+
+
+    JTCluster.prototype.restartAll = function() {
+      return process.send({
+        cmd: 'jt_restartall',
+        timeout: 30000
+      });
+    };
 
     /**
      * start 启动应用
@@ -33,17 +46,17 @@
 
 
     JTCluster.prototype.start = function(options) {
-      var childProcess, i, total, _i,
+      var childProcess, i, total, _i, _ref, _ref1, _ref2,
         _this = this;
       this.options = options != null ? options : {};
       if (cluster.isMaster) {
-        if (options.interval == null) {
+        if ((_ref = options.interval) == null) {
           options.interval = 10 * 1000;
         }
-        if (options.timeout == null) {
+        if ((_ref1 = options.timeout) == null) {
           options.timeout = 10 * 1000;
         }
-        if (options.failTimes == null) {
+        if ((_ref2 = options.failTimes) == null) {
           options.failTimes = 5;
         }
         if (options.masterHandler) {

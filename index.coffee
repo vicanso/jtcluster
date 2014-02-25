@@ -11,6 +11,15 @@ noop = ->
 
 class JTCluster extends events.EventEmitter
   ###*
+   * restartAll 重启所有worker
+   * @return {[type]} [description]
+  ###
+  restartAll : ->
+    process.send {
+      cmd : 'jt_restartall'
+      timeout : 30000
+    }
+  ###*
    * start 启动应用
    * @param  {[type]} @options [description]
    * @return {[type]}          [description]
