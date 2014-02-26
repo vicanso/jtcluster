@@ -222,5 +222,7 @@ class JTCluster extends events.EventEmitter
       @_checkWorker()
     , @options.interval
     @
+    
+JTCluster.restartAll = JTCluster::restartAll
 
 module.exports = JTCluster

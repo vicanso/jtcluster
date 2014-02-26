@@ -324,6 +324,8 @@
 
   })(events.EventEmitter);
 
+  JTCluster.restartAll = JTCluster.prototype.restartAll;
+
   module.exports = JTCluster;
 
 }).call(this);
