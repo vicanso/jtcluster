@@ -65,7 +65,7 @@ class JTCluster extends events.EventEmitter
         @emit 'log', {
           category : 'uncaughtException'
           params : JSON.stringify params
-          date : new Date
+          date : new Date()
         }
         # error err
         if restartOnError
@@ -80,6 +80,7 @@ class JTCluster extends events.EventEmitter
         process.send HEALTHY_MSG
       else if msg?.msg == SET_JT_PID_MSG
         process._jtPid = msg._jtPid
+      return
     @
   ###*
    * _msgHandler 消息处理
@@ -212,7 +213,7 @@ class JTCluster extends events.EventEmitter
         @emit 'log', {
           category : 'toobusy'
           params : JSON.stringify params
-          date : new Date
+          date : new Date()
         }
         worker.kill()
       else

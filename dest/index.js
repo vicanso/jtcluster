@@ -110,7 +110,7 @@
             _this.emit('log', {
               category: 'uncaughtException',
               params: JSON.stringify(params),
-              date: new Date
+              date: new Date()
             });
             if (restartOnError) {
               setTimeout(function() {
@@ -126,9 +126,9 @@
       }
       process.on('message', function(msg) {
         if (msg === CHECK_MSG) {
-          return process.send(HEALTHY_MSG);
+          process.send(HEALTHY_MSG);
         } else if ((msg != null ? msg.msg : void 0) === SET_JT_PID_MSG) {
-          return process._jtPid = msg._jtPid;
+          process._jtPid = msg._jtPid;
         }
       });
       return this;
@@ -314,7 +314,7 @@
             _this.emit('log', {
               category: 'toobusy',
               params: JSON.stringify(params),
-              date: new Date
+              date: new Date()
             });
             return worker.kill();
           } else {
