@@ -14,7 +14,7 @@
 (function() {
   var jtCluster, options;
 
-  jtCluster = require('jtcluster');
+  var JTCluster = require('jtcluster');
 
   options = {
     // 检测的时间间隔
@@ -63,7 +63,7 @@
       }, 10000);
     }
   };
-
+  jtCluster = new JTCluster();
   jtCluster.start(options);
 
 }).call(this);
