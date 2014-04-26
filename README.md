@@ -63,8 +63,7 @@
       }, 10000);
     }
   };
-  jtCluster = new JTCluster();
-  jtCluster.start(options);
+  jtCluster = new JTCluster(options);
 
 }).call(this);
 

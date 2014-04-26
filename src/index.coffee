@@ -11,20 +11,11 @@ noop = ->
 
 class JTCluster extends events.EventEmitter
   ###*
-   * restartAll 重启所有worker
-   * @return {[type]} [description]
-  ###
-  restartAll : ->
-    process.send {
-      cmd : 'jt_restartall'
-      timeout : 30000
-    }
-  ###*
-   * start 启动应用
+   * constructor 构造函数
    * @param  {[type]} @options [description]
    * @return {[type]}          [description]
   ###
-  start : (@options = {}) ->
+  constructor : (@options = {}) ->
     if cluster.isMaster
       options.interval ?= 10 * 1000
       options.timeout ?= 10 * 1000
@@ -43,7 +34,15 @@ class JTCluster extends events.EventEmitter
         worker.send {msg : SET_JT_PID_MSG, _jtPid : worker._jtPid}
     else
       @_slaveHandler()
-    @
+  ###*
+   * restartAll 重启所有worker
+   * @return {[type]} [description]
+  ###
+  restartAll : ->
+    process.send {
+      cmd : 'jt_restartall'
+      timeout : 30000
+    }
   ###*
    * _slaveHandler slave的执行函数
    * @return {[type]} [description]

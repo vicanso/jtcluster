@@ -20,31 +20,14 @@
   JTCluster = (function(_super) {
     __extends(JTCluster, _super);
 
-    function JTCluster() {
-      return JTCluster.__super__.constructor.apply(this, arguments);
-    }
-
 
     /**
-     * restartAll 重启所有worker
-     * @return {[type]} [description]
-     */
-
-    JTCluster.prototype.restartAll = function() {
-      return process.send({
-        cmd: 'jt_restartall',
-        timeout: 30000
-      });
-    };
-
-
-    /**
-     * start 启动应用
+     * constructor 构造函数
      * @param  {[type]} @options [description]
      * @return {[type]}          [description]
      */
 
-    JTCluster.prototype.start = function(options) {
+    function JTCluster(options) {
       var childProcess, i, total, _i;
       this.options = options != null ? options : {};
       if (cluster.isMaster) {
@@ -82,7 +65,19 @@
       } else {
         this._slaveHandler();
       }
-      return this;
+    }
+
+
+    /**
+     * restartAll 重启所有worker
+     * @return {[type]} [description]
+     */
+
+    JTCluster.prototype.restartAll = function() {
+      return process.send({
+        cmd: 'jt_restartall',
+        timeout: 30000
+      });
     };
 
 
