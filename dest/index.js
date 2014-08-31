@@ -311,10 +311,14 @@
               params: JSON.stringify(params),
               date: new Date()
             });
-            return worker.kill();
+            worker.kill();
           } else {
-            CHECK_TIMES[pid].now = Date.now();
-            return worker.send(CHECK_MSG);
+            if (worker.suicide) {
+              CHECK_TIMES[pid].now = 0;
+            } else {
+              CHECK_TIMES[pid].now = Date.now();
+              worker.send(CHECK_MSG);
+            }
           }
         };
       })(this));

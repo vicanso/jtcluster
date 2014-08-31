@@ -1,5 +1,5 @@
-JTCluster = require '../index'
-jtCluster = new JTCluster
+JTCluster = require '../dest/index'
+
 options = 
   # 检测的时间间隔
   interval : 10 * 1000
@@ -47,7 +47,8 @@ options =
       cbf null
     , 10000
 
-jtCluster.start options
+
+jtCluster = new JTCluster options
 
 jtCluster.on 'log', (data) ->
   console.dir data

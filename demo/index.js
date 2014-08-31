@@ -1,9 +1,7 @@
 (function() {
   var JTCluster, jtCluster, options;
 
-  JTCluster = require('../index');
-
-  jtCluster = new JTCluster;
+  JTCluster = require('../dest/index');
 
   options = {
     interval: 10 * 1000,
@@ -57,7 +55,7 @@
     }
   };
 
-  jtCluster.start(options);
+  jtCluster = new JTCluster(options);
 
   jtCluster.on('log', function(data) {
     return console.dir(data);

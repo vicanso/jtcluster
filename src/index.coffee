@@ -216,8 +216,12 @@ class JTCluster extends events.EventEmitter
         }
         worker.kill()
       else
-        CHECK_TIMES[pid].now = Date.now()
-        worker.send CHECK_MSG
+        if worker.suicide
+          CHECK_TIMES[pid].now = 0
+        else
+          CHECK_TIMES[pid].now = Date.now()
+          worker.send CHECK_MSG
+      return
     setTimeout =>
       @_checkWorker()
     , @options.interval
