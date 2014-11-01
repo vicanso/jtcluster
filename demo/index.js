@@ -1,13 +1,17 @@
 (function() {
-  var JTCluster, jtCluster, options;
+  var JTCluster, jtCluster, jtDebug, options;
 
   JTCluster = require('../dest/index');
+
+  jtDebug = require('../../jtdebug');
+
+  jtDebug(JTCluster);
 
   options = {
     interval: 10 * 1000,
     timeout: 5 * 1000,
     failTimes: 5,
-    slaveTotal: 3,
+    slaveTotal: 1,
     restartOnError: true,
     slaveHandler: function() {
       var http, port, server;
@@ -43,10 +47,7 @@
       });
       port = 10000;
       server.listen(port);
-      console.dir("listen on " + port);
-      return setTimeout(function() {
-        return console.dir(process._jtPid);
-      }, 1000);
+      return console.dir("listen on " + port);
     },
     beforeRestart: function(cbf) {
       return setTimeout(function() {
@@ -57,8 +58,10 @@
 
   jtCluster = new JTCluster(options);
 
-  jtCluster.on('log', function(data) {
-    return console.dir(data);
-  });
+  if (jtCluster.isWorker) {
+    jtCluster.send('测试', function(err, data) {
+      return console.dir(data);
+    });
+  }
 
 }).call(this);

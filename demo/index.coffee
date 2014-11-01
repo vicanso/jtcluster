@@ -1,5 +1,6 @@
 JTCluster = require '../dest/index'
-
+jtDebug = require '../../jtdebug'
+jtDebug JTCluster
 options = 
   # 检测的时间间隔
   interval : 10 * 1000
@@ -8,7 +9,7 @@ options =
   # 连续失败多少次后重启
   failTimes : 5
   # 子进程的个数
-  slaveTotal : 3
+  slaveTotal : 1
   restartOnError : true
   slaveHandler : ->
     http = require 'http'
@@ -38,9 +39,6 @@ options =
     port = 10000
     server.listen port
     console.dir "listen on #{port}"
-    setTimeout ->
-      console.dir process._jtPid
-    , 1000
   beforeRestart : (cbf) ->
     #do some before restart
     setTimeout ->
@@ -49,6 +47,23 @@ options =
 
 
 jtCluster = new JTCluster options
+if jtCluster.isWorker
+  jtCluster.send '测试', (err, data) ->
+    console.dir data
+# jtCluster.on 'jtPid', (jtPid) ->
+#   process._jtPid = jtPid
+#   if jtPid == 0
+#     setTimeout ->
+#       console.dir '.jaojfoeajfoe'
+#       jtCluster.getAllWorkderStatus (err, statusList) ->
+#     , 1000
+#   return
+# jtCluster.on 'status', (msgId) ->
+#   jtCluster.send {
+#     type : 'reply'
+#     id : msgId
+#     uptime : process.uptime()
+#   }
 
-jtCluster.on 'log', (data) ->
-  console.dir data
+# jtCluster.on 'log', (data) ->
+#   console.dir data

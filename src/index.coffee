@@ -1,12 +1,10 @@
 cluster = require 'cluster'
 events = require 'events'
-CHECK_TIMES = {}
 
-CHECK_MSG = 'WORKER_CHECK'
-HEALTHY_MSG = 'I AM HEALTHY'
-SET_JT_PID_MSG = 'SET JT PID'
-
+# 检测次数相关信息记录
+CHECK_INFOS = {}
 noop = ->
+
 
 
 class JTCluster extends events.EventEmitter
@@ -16,217 +14,262 @@ class JTCluster extends events.EventEmitter
    * @return {[type]}          [description]
   ###
   constructor : (@options = {}) ->
+    # process.on 'message', (msg) ->
+    #   console.dir "process isMaster:#{cluster.isMaster} pid:#{process.pid} #{msg}"
+    @isMaster = cluster.isMaster
+    @isWorker = cluster.isWorker
     if cluster.isMaster
-      options.interval ?= 10 * 1000
-      options.timeout ?= 10 * 1000
-      options.failTimes ?= 5
-      if options.masterHandler
-        options.masterHandler()
+      # 检测的时间间隔
+      options.interval = options.interval || 10 * 1000
+      # worker检测的超时值
+      options.timeout = options.timeout || 10 * 1000
+      # 连续检测失败多少次后重启
+      options.failTimes = options.failTimes || 10 * 1000
+
+      options.masterHandler() if options.masterHandler
+
       total = options.slaveTotal || require('os').cpus().length
       total = 1 if total < 1
       for i in [0...total]
         childProcess = cluster.fork()
         childProcess._jtPid = i
-        # console.dir childProcess
-      @_initEvent()
-      Object.keys(cluster.workers).forEach (id) =>
-        worker = cluster.workers[id]
-        worker.send {msg : SET_JT_PID_MSG, _jtPid : worker._jtPid}
+      @_initMasterEvent()
     else
-      @_slaveHandler()
+      process.on 'message', (data) =>
+        return @ if data?.category != 'jtCluster'
+        data = data.data
+        if data.type == 'reply'
+          @emit data.id, data
+      @options.slaveHandler?()
+
   ###*
-   * restartAll 重启所有worker
+   * 生成消息唯一id
    * @return {[type]} [description]
   ###
-  restartAll : ->
-    process.send {
-      cmd : 'jt_restartall'
-      timeout : 30000
-    }
+  _uniqueId : ->
+    str = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace /[xy]/g, (c) ->
+      r = Math.random() * 16 | 0
+      if c == 'x'
+        v = r
+      else
+        v = r & 0x3|0x8
+
+      v.toString 16
+    str
+
   ###*
-   * _slaveHandler slave的执行函数
+   * _initMasterEvent 初始化事件，消息的处理
    * @return {[type]} [description]
   ###
-  _slaveHandler : ->
-    # error = @options.error || noop
-    restartOnError = @options.restartOnError
-    slaveHandler = @options.slaveHandler
-    domain = require 'domain'
-    if slaveHandler
-      # 添加domain，用于捕获异常
-      d = domain.create()
-      d.on 'error', (err) =>
-        params = 
-          pid : process.pid
-          _jtPid : process._jtPid
-          err : err.toString()
-          stack : err.stack
-        @emit 'log', {
-          category : 'uncaughtException'
-          params : JSON.stringify params
-          date : new Date()
-        }
-        # error err
-        if restartOnError
-          setTimeout ->
-            process.exit 1
-          , 30000
-          cluster.worker.disconnect()
-      d.run ->
-        slaveHandler()
-    process.on 'message', (msg) ->
-      if msg == CHECK_MSG
-        process.send HEALTHY_MSG
-      else if msg?.msg == SET_JT_PID_MSG
-        process._jtPid = msg._jtPid
-      return
-    @
-  ###*
-   * _msgHandler 消息处理
-   * @param  {[type]} msg [description]
-   * @param  {[type]} pid [description]
-   * @return {[type]}     [description]
-  ###
-  _msgHandler : (msg, pid) ->
-    # 检测worker是否有响应healthy
-    if msg == HEALTHY_MSG
-      # 超过多长时间返回认为worker卡住
-      if Date.now() - CHECK_TIMES[pid].now > @options.timeout
-        CHECK_TIMES[pid].fail++
-      else
-        # 正常返回将fail置0
-        CHECK_TIMES[pid].fail = 0
-      CHECK_TIMES[pid].now = 0
-      return @
-    cmd = msg?.cmd
-    if cmd
-      func = ''
-      if cmd == 'jt_restart'
-        func = 'disconnect'
-      else if cmd == 'jt_restartall'
-        func = 'disconnect'
-        pid = null
-      else if cmd == 'jt_kill'
-        func = 'kill'
-      else if cmd == 'jt_killall'
-        func = 'kill'
-        pid = null
-      @_do func, pid
-    @
-  ###*
-   * _do 执行message中的命令
-   * @param  {[type]} func    [description]
-   * @param  {[type]} pid [description]
-   * @return {[type]}         [description]
-  ###
-  _do : (func, pid) ->
-    beforeRestart = @options.beforeRestart
-    # timeout时间之内如果worker没退出，强制kill
-    forceKill = (worker) ->
-      killtimer = setTimeout ->
-        if worker.state != 'dead'
-          worker.kill()
-      , 30000
-      killtimer.unref()
-    restart = (worker, pid) ->
-      if pid
-        if worker.process.pid == pid
-          worker[func]()
-          # 多长时间没退出直接使用kill
-          if func != 'kill'
-            forceKill worker
-      else
-        worker[func]()
-        # 多长时间没退出直接使用kill
-        if func != 'kill'
-          forceKill worker
-    if func
-      if beforeRestart
-        beforeRestart (err) ->
-          if !err
-            Object.keys(cluster.workers).forEach (id) ->
-              worker = cluster.workers[id]
-              restart worker, pid
-      else
-        Object.keys(cluster.workers).forEach (id) ->
-          worker = cluster.workers[id]
-          restart worker, pid
-    @
-  ###*
-   * _initEvent 初始化事件，消息的处理
-   * @return {[type]} [description]
-  ###
-  _initEvent : ->
-    # error = @options?.error || noop
+  _initMasterEvent : ->
     cluster.on 'exit', (worker) =>
       # 当有worker退出时，重新fork一个新的
       pid = worker.process.pid
-      delete CHECK_TIMES[pid]
-      _jtPid = worker._jtPid
-      params = 
+      delete CHECK_INFOS[pid]
+      jtPid = worker._jtPid
+      params =
         pid : pid
-        _jtPid : _jtPid
+        _jtPid : jtPid
       @emit 'log', {
         category : 'exit'
         params : JSON.stringify params
         date : new Date()
       }
+
       worker = cluster.fork()
-      # worker添加消息处理
-      worker.on 'message', (msg) =>
-        @_msgHandler msg, worker.process.pid
-      worker._jtPid = _jtPid
-      worker.send {msg : SET_JT_PID_MSG, _jtPid : _jtPid}
+      @_initWorkerEvent worker
+      return
+    
     Object.keys(cluster.workers).forEach (id) =>
-      # 对当前的worker添加消息处理
-      worker = cluster.workers[id]
-      worker.on 'message', (msg) =>
-        @_msgHandler msg, worker.process.pid
+      @_initWorkerEvent cluster.workers[id]
+      return
+
     cluster.on 'online', (worker) =>
       pid = worker.process.pid
-      CHECK_TIMES[pid] = {fail : 0}
+      _jtPid = worker._jtPid
+      CHECK_INFOS[pid] = {fail : 0}
       params = 
         pid : pid
-        _jtPid : worker._jtPid
+        _jtPid : _jtPid
       @emit 'log', {
         category : 'online'
         params : JSON.stringify params
         date : new Date()
       }
-    setTimeout =>
-      @_checkWorker()
-    , @options.interval
-    @
-  _checkWorker : ->
-    # 发送检测healthy的消息给worker, worker返回以判断worker是否卡住
-    Object.keys(cluster.workers).forEach (id) =>
-      worker = cluster.workers[id]
-      pid = worker.process.pid
-      # 若now未被置0证明在interval时间内，该worker未返回
-      if CHECK_TIMES[pid].now
-        CHECK_TIMES[pid].fail++
-      if CHECK_TIMES[pid].fail >= @options.failTimes
-        params = 
-          pid : pid
-          _jtPid : worker._jtPid
-        @emit 'log', {
-          category : 'toobusy'
-          params : JSON.stringify params
-          date : new Date()
-        }
-        worker.kill()
-      else
-        if worker.suicide
-          CHECK_TIMES[pid].now = 0
-        else
-          CHECK_TIMES[pid].now = Date.now()
-          worker.send CHECK_MSG
+      # @_sendToWorker {
+      #   jtPid : _jtPid
+      #   type : 'jtPid'
+      # }, worker.id
       return
-    setTimeout =>
-      @_checkWorker()
-    , @options.interval
     @
+
+  _initWorkerEvent : (worker) ->
+    worker.on 'message', (data) =>
+      return @ if data?.category != 'jtCluster'
+      data = data.data
+      worker.send {
+        category : 'jtCluster'
+        data :
+          type : 'reply'
+          id : data.id
+          msg : 'xxxxx'
+      }
+    @
+
+  ###*
+   * [send worker to master]
+   * @param  {[type]} msg [description]
+   * @param  {[type]} cbf [description]
+   * @return {[type]}     [description]
+  ###
+  send : (msg, cbf) ->
+    id = @_uniqueId()
+    process.send {
+      category : 'jtCluster'
+      data : 
+        msg : msg
+        id : id
+    }
+    if cbf
+      @once id, (data) ->
+        cbf null, data
+        return
+    return
+
+  # ###*
+  #  * [broadcast 广播给所有worker]
+  #  * @param  {[type]} msg [description]
+  #  * @return {[type]}     [description]
+  # ###
+  # broadcast : (msg)->
+  #   if cluster.isMaster
+  #     @_sendToWorker msg
+  #   else
+  #     data =
+  #       msg : msg
+  #       from : 'slave'
+  #       type : 'broadcast'
+  #       category : 'jtCluster'
+  #     process.send data
+
+  # send : (msg) ->
+  #   if cluster.isMaster
+  #     @_sendToWorker msg
+  #   else
+  #     data =
+  #       msg : msg
+  #       category : 'jtCluster'
+  #       from : 'slave'
+  #     process.send data
+
+  # getAllWorkderStatus : (cbf) ->
+  #   @broadcast {
+  #     type : 'status'
+  #   }
+
+
+
+
+  # restartAll : ->
+
+
+  # ###*
+  #  * 生成消息唯一id
+  #  * @return {[type]} [description]
+  # ###
+  # _uniqueId : ->
+  #   str = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace /[xy]/g, (c) ->
+  #     r = Math.random() * 16 | 0
+  #     if c == 'x'
+  #       v = r
+  #     else
+  #       v = r & 0x3|0x8
+
+  #     v.toString 16
+  #   str
+  # _sendToWorker : (msg, workerId) ->
+  #   data =
+  #     id : @_uniqueId()
+  #     from : 'master'
+  #     msg : msg
+  #     category : 'jtCluster'
+  #   if workerId?
+  #     cluster.workers[workerId].send data
+  #   else
+  #     Object.keys(cluster.workers).forEach (id) =>
+  #       cluster.workers[id].send data
+  #       return
+  #   @
+
+  # _initWorkerEvent : (worker) ->
+  #   worker.on 'message', (data) =>
+  #     return @ if data?.category != 'jtCluster' || data?.from != 'slave'
+  #     type = data?.type
+  #     msg = data?.msg
+  #     if type == 'broadcast'
+  #       @broadcast data.msg
+  #       return @
+      
+  #     switch msg?.type
+  #       when 'reply'
+  #         console.dir msg
+  #   @
+  # ###*
+  #  * _initMasterEvent 初始化事件，消息的处理
+  #  * @return {[type]} [description]
+  # ###
+  # _initMasterEvent : ->
+  #   cluster.on 'exit', (worker) =>
+  #     # 当有worker退出时，重新fork一个新的
+  #     pid = worker.process.pid
+  #     delete CHECK_INFOS[pid]
+  #     jtPid = worker._jtPid
+  #     params =
+  #       pid : pid
+  #       _jtPid : jtPid
+  #     @emit 'log', {
+  #       category : 'exit'
+  #       params : JSON.stringify params
+  #       date : new Date()
+  #     }
+
+  #     worker = cluster.fork()
+  #     @_initWorkerEvent worker
+  #     return
     
-JTCluster.restartAll = JTCluster::restartAll
+  #   Object.keys(cluster.workers).forEach (id) =>
+  #     @_initWorkerEvent cluster.workers[id]
+  #     return
+
+  #   cluster.on 'online', (worker) =>
+  #     pid = worker.process.pid
+  #     _jtPid = worker._jtPid
+  #     CHECK_INFOS[pid] = {fail : 0}
+  #     params = 
+  #       pid : pid
+  #       _jtPid : _jtPid
+  #     @emit 'log', {
+  #       category : 'online'
+  #       params : JSON.stringify params
+  #       date : new Date()
+  #     }
+  #     @_sendToWorker {
+  #       jtPid : _jtPid
+  #       type : 'jtPid'
+  #     }, worker.id
+  #     return
+  #   @
+
+  # _initSlaveMsgHandler : ->
+  #   @on 'message', (data) ->
+  #     type = data?.msg?.type
+  #     switch type
+  #       when 'jtPid'
+  #         @emit 'jtPid', data.msg.jtPid
+  #       when 'status'
+  #         @emit 'status', data.id
+  #       else
+  #         console.dir data
 
 module.exports = JTCluster
+

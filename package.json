@@ -17,9 +17,9 @@
   "main": "dest/index",
   "readmeFilename": "README.md",
   "devDependencies": {
-    "grunt": "~0.4.4",
+    "grunt": "~0.4.5",
     "grunt-contrib-clean": "~0.5.0",
-    "grunt-contrib-coffee": "~0.10.1",
+    "grunt-contrib-coffee": "~0.11.1",
     "grunt-contrib-jshint": "^0.10.0"
   }
 }
