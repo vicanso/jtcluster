@@ -1,10 +1,7 @@
 var JTCluster = require('../index');
 var tmpCluster = new JTCluster({
   handler : function(){
-    // 获取所有worker的信息
-    tmpCluster.getWorkersInfo(function(err, infos){
-      console.dir(infos);
-    })
+    
     var express = require('express');
     var app = express();
 
@@ -26,6 +23,12 @@ var tmpCluster = new JTCluster({
       }
     });
     app.listen(8080);
+    setTimeout(function(){
+      // 获取所有worker的信息
+      tmpCluster.getWorkersInfo(function(err, infos){
+        console.dir(infos);
+      });
+    }, 1000);
   },
   // 用于fork worker的传给worker的参数
   envs : [
@@ -35,7 +38,5 @@ var tmpCluster = new JTCluster({
     {
       jtProcessName : 'cuttlefish'
     }
-  ],
-  error : console.error,
-  log : console.log
+  ]
 });
