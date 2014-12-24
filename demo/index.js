@@ -28,7 +28,7 @@ var tmpCluster = new JTCluster({
       tmpCluster.getWorkersInfo(function(err, infos){
         console.dir(infos);
       });
-    }, 1000);
+    }, 10000);
   },
   // 用于fork worker的传给worker的参数
   envs : [

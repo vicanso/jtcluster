@@ -48,9 +48,7 @@ var tmpCluster = new JTCluster({
     {
       jtProcessName : 'cuttlefish'
     }
-  ],
-  error : console.error,
-  log : console.log
+  ]
 });
 
 ```
